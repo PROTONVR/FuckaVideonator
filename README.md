@@ -1,4 +1,4 @@
-Fuck-a-Videonator portable
+FuckaVideonator portable
 ========================
 
 Run:
