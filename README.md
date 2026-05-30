@@ -1,5 +1,5 @@
 Vestroyer portable
-========================
+==================
 
 Run:
 1. Open Vestroyer.exe.
@@ -7,6 +7,12 @@ Run:
 3. Pick a video and destroy it.
 
 Do not remove ffmpeg.exe from this folder. The app uses it to process videos.
+
+Windows SmartScreen:
+Windows may show a SmartScreen warning because Vestroyer is a new unsigned
+.exe file. The app is portable, does not install anything, and runs from this
+folder. If you trust the download source, click "More info", then
+"Run anyway".
 
 Portable notes:
 - No installation required.
@@ -25,6 +31,12 @@ Uruchamianie:
 3. Wybierz film i rozwal jego jakość.
 
 Nie usuwaj ffmpeg.exe z tego folderu. Program używa go do przerabiania filmów.
+
+Windows SmartScreen:
+Windows może pokazać ostrzeżenie SmartScreen, ponieważ Vestroyer jest nowym,
+niepodpisanym plikiem .exe. Program jest portable, nie instaluje niczego w
+systemie i działa z tego folderu. Jeśli ufasz źródłu pobrania, kliknij
+"Więcej informacji", a potem "Uruchom mimo to".
 
 Notatki portable:
 - Nie trzeba nic instalować.
