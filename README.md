@@ -1,8 +1,8 @@
-FuckaVideonator portable
+Vestroyer portable
 ========================
 
 Run:
-1. Open FuckaVideonator.exe.
+1. Open Vestroyer.exe.
 2. Choose English or Polski.
 3. Pick a video and destroy it.
 
@@ -15,12 +15,12 @@ Portable notes:
 - The app keeps FPS behavior unchanged: it does not force a new FPS value.
 
 Included:
-- FuckaVideonator.exe
+- Vestroyer.exe
 - ffmpeg.exe
 
 Polski:
 Uruchamianie:
-1. Otwórz FuckaVideonator.exe.
+1. Otwórz Vestroyer.exe.
 2. Wybierz English albo Polski.
 3. Wybierz film i rozwal jego jakość.
 
@@ -33,5 +33,5 @@ Notatki portable:
 - Program nie wymusza nowej wartości FPS.
 
 W zestawie:
-- FuckaVideonator.exe
+- Vestroyer.exe
 - ffmpeg.exe
