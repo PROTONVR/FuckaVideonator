@@ -1,92 +1,373 @@
-#!/usr/bin/env sh
-set -eu
+#!/usr/bin/env python3
+import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
-SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-VESTROYER="$SOURCE_DIR/vestroyer"
-WORKDIR=$(mktemp -d)
-INPUT="$WORKDIR/input.mp4"
-FAILED=0
-PASSED=0
 
-cleanup() {
-  rm -rf "$WORKDIR"
+VERSION = "1.1"
+
+
+PRESETS = {
+    "4k": {
+        "label": "4K UHD - nearly clean",
+        "size": "3840:2160",
+        "crf": "30",
+        "audio_bitrate": "128k",
+        "audio_rate": "44100",
+        "filters": [],
+    },
+    "1080": {
+        "label": "Full HD - slightly degraded",
+        "size": "1920:1080",
+        "crf": "34",
+        "audio_bitrate": "112k",
+        "audio_rate": "44100",
+        "filters": [],
+    },
+    "720": {
+        "label": "HD - noticeably degraded",
+        "size": "1280:720",
+        "crf": "36",
+        "audio_bitrate": "96k",
+        "audio_rate": "44100",
+        "filters": [],
+    },
+    "480": {
+        "label": "480p - mildly ugly",
+        "size": "854:480",
+        "crf": "38",
+        "audio_bitrate": "80k",
+        "audio_rate": "44100",
+        "filters": [],
+    },
+    "360": {
+        "label": "360p - low quality",
+        "size": "640:360",
+        "crf": "40",
+        "audio_bitrate": "64k",
+        "audio_rate": "32000",
+        "filters": ["noise=alls=12:allf=t+u"],
+    },
+    "240": {
+        "label": "240p - properly wrecked",
+        "size": "426:240",
+        "crf": "43",
+        "audio_bitrate": "48k",
+        "audio_rate": "24000",
+        "filters": ["noise=alls=20:allf=t+u"],
+    },
+    "144": {
+        "label": "144p - very low quality",
+        "size": "256:144",
+        "crf": "47",
+        "audio_bitrate": "32k",
+        "audio_rate": "22050",
+        "filters": ["boxblur=1:1", "noise=alls=32:allf=t+u"],
+    },
+    "96": {
+        "label": "96p - barely readable",
+        "size": "170:96",
+        "crf": "50",
+        "audio_bitrate": "24k",
+        "audio_rate": "16000",
+        "filters": ["boxblur=2:1", "noise=alls=45:allf=t+u", "eq=saturation=0.35"],
+    },
+    "wtf": {
+        "label": "barely visible",
+        "size": "64:36",
+        "crf": "51",
+        "audio_bitrate": "16k",
+        "audio_rate": "12000",
+        "filters": ["boxblur=4:2", "noise=alls=80:allf=t+u", "eq=saturation=0.15:contrast=1.8"],
+    },
 }
-trap cleanup EXIT
 
-if ! command -v ffmpeg >/dev/null 2>&1; then
-  echo "error: ffmpeg is required for preset tests" >&2
-  exit 1
-fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "error: python3 is required for preset tests" >&2
-  exit 1
-fi
+PRESET_ALIASES = {
+    "2160": "4k",
+    "uhd": "4k",
+    "fullhd": "1080",
+    "fhd": "1080",
+    "hd": "720",
+    "36": "wtf",
+    "64x36": "wtf",
+}
 
-chmod +x "$VESTROYER"
 
-echo "creating short test clip..."
-ffmpeg -hide_banner -loglevel error -y \
-  -f lavfi -i "testsrc=size=1280x720:rate=30" \
-  -f lavfi -i "sine=frequency=440:duration=2" \
-  -shortest -t 2 -pix_fmt yuv420p "$INPUT"
+AUDIO_PRESETS = {
+    "clean": {
+        "label": "clean audio - 128k",
+        "audio_bitrate": "128k",
+        "audio_rate": "44100",
+    },
+    "normal": {
+        "label": "normal audio - 96k",
+        "audio_bitrate": "96k",
+        "audio_rate": "44100",
+    },
+    "low": {
+        "label": "low audio - 64k",
+        "audio_bitrate": "64k",
+        "audio_rate": "32000",
+    },
+    "crunchy": {
+        "label": "crunchy audio - 32k",
+        "audio_bitrate": "32k",
+        "audio_rate": "22050",
+    },
+    "phone": {
+        "label": "phone audio - 16k",
+        "audio_bitrate": "16k",
+        "audio_rate": "16000",
+    },
+    "destroyed": {
+        "label": "destroyed audio - 8k",
+        "audio_bitrate": "8k",
+        "audio_rate": "8000",
+    },
+}
 
-PRESETS="4k 1080 720 480 360 240 144 96 wtf"
-APRESETS="clean normal low crunchy phone destroyed"
 
-echo "testing presets..."
-for preset in $PRESETS; do
-  output="$WORKDIR/output_${preset}.mp4"
-  printf '  %-5s ... ' "$preset"
-  if "$VESTROYER" "$INPUT" -preset "$preset" "$output" >/dev/null 2>&1; then
-    if [ -s "$output" ]; then
-      echo "ok"
-      PASSED=$((PASSED + 1))
-    else
-      echo "fail (empty output)"
-      FAILED=$((FAILED + 1))
-    fi
-  else
-    echo "fail"
-    FAILED=$((FAILED + 1))
-  fi
-done
+AUDIO_PRESET_ALIASES = {
+    "128k": "clean",
+    "96k": "normal",
+    "64k": "low",
+    "32k": "crunchy",
+    "16k": "phone",
+    "8k": "destroyed",
+}
 
-echo "testing audio presets..."
-for apreset in $APRESETS; do
-  output="$WORKDIR/audio_${apreset}.mp4"
-  printf '  %-9s ... ' "$apreset"
-  if "$VESTROYER" "$INPUT" -preset 240 -apreset "$apreset" "$output" >/dev/null 2>&1; then
-    if [ -s "$output" ]; then
-      echo "ok"
-      PASSED=$((PASSED + 1))
-    else
-      echo "fail (empty output)"
-      FAILED=$((FAILED + 1))
-    fi
-  else
-    echo "fail"
-    FAILED=$((FAILED + 1))
-  fi
-done
 
-echo "testing preset aliases..."
-for alias in uhd fhd hd 64x36; do
-  output="$WORKDIR/alias_${alias}.mp4"
-  printf '  %-6s ... ' "$alias"
-  if "$VESTROYER" "$INPUT" -preset "$alias" "$output" >/dev/null 2>&1; then
-    echo "ok"
-    PASSED=$((PASSED + 1))
-  else
-    echo "fail"
-    FAILED=$((FAILED + 1))
-  fi
-done
+def preset_help():
+    lines = ["available presets:"]
+    for name, preset in PRESETS.items():
+        lines.append(
+            f"  {name:<5} {preset['label']} "
+            f"({preset['size']}, CRF {preset['crf']}, audio {preset['audio_bitrate']} / {preset['audio_rate']})"
+        )
+    lines.append("")
+    lines.append("aliases: 2160/uhd -> 4k, fullhd/fhd -> 1080, hd -> 720, 36/64x36 -> wtf")
+    return "\n".join(lines)
 
-echo
-echo "passed: $PASSED"
-echo "failed: $FAILED"
 
-if [ "$FAILED" -ne 0 ]; then
-  exit 1
-fi
+def audio_preset_help():
+    lines = ["available audio presets:"]
+    for name, preset in AUDIO_PRESETS.items():
+        lines.append(
+            f"  {name:<9} {preset['label']} "
+            f"({preset['audio_bitrate']}, {preset['audio_rate']} Hz)"
+        )
+    lines.append("")
+    lines.append("aliases: 128k -> clean, 96k -> normal, 64k -> low, 32k -> crunchy, 16k -> phone, 8k -> destroyed")
+    return "\n".join(lines)
+
+
+def maybe_show_flag_help(argv):
+    args = list(argv)
+    index = 0
+    while index < len(args):
+        item = args[index]
+        if item in ("-preset", "--preset") and index + 1 < len(args) and args[index + 1].lower() == "help":
+            print(preset_help())
+            return True
+        if item in ("-apreset", "--apreset") and index + 1 < len(args) and args[index + 1].lower() == "help":
+            print(audio_preset_help())
+            return True
+        index += 1
+    return False
+
+
+class Parser(argparse.ArgumentParser):
+    def format_help(self):
+        text = super().format_help()
+        return f"{text}\n{preset_help()}\n\n{audio_preset_help()}\n"
+
+
+def normalize_preset(value):
+    key = value.lower().strip()
+    return PRESET_ALIASES.get(key, key)
+
+
+def build_filter(preset):
+    filters = [
+        f"scale={preset['size']}:force_original_aspect_ratio=decrease:force_divisible_by=2",
+        "setsar=1",
+    ]
+    filters.extend(preset["filters"])
+    return ",".join(filters)
+
+
+def normalize_audio_preset(value):
+    key = value.lower().strip()
+    return AUDIO_PRESET_ALIASES.get(key, key)
+
+
+def build_command(ffmpeg, input_path, output_path, preset, audio_preset, passthrough_fps=True, include_audio=True):
+    command = [
+        ffmpeg,
+        "-y",
+        "-hide_banner",
+        "-err_detect",
+        "ignore_err",
+        "-fflags",
+        "+genpts+igndts+discardcorrupt",
+        "-i",
+        str(input_path),
+        "-map",
+        "0:v:0",
+    ]
+    if include_audio:
+        command.extend(["-map", "0:a?"])
+
+    command.extend(
+        [
+            "-vf",
+            build_filter(preset),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            preset["crf"],
+            "-pix_fmt",
+            "yuv420p",
+        ]
+    )
+
+    if include_audio:
+        command.extend(
+            [
+                "-c:a",
+                "aac",
+                "-b:a",
+                audio_preset["audio_bitrate"],
+                "-ar",
+                audio_preset["audio_rate"],
+            ]
+        )
+    else:
+        command.append("-an")
+
+    command.extend(["-movflags", "+faststart"])
+    if passthrough_fps:
+        command.extend(["-fps_mode", "passthrough"])
+    command.append(str(output_path))
+    return command
+
+
+def short_ffmpeg_error(stderr):
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    useful = []
+    noisy_prefixes = (
+        "ffmpeg version",
+        "built with",
+        "configuration:",
+        "libav",
+        "libsw",
+        "libpostproc",
+        "Input #",
+        "Metadata:",
+        "Duration:",
+        "Stream #",
+        "Press [q]",
+    )
+    for line in lines:
+        if line.startswith(noisy_prefixes):
+            continue
+        lower = line.lower()
+        if any(word in lower for word in ("error", "invalid", "failed", "could not", "corrupt", "moov", "codec", "permission")):
+            useful.append(line)
+    if not useful:
+        useful = lines[-8:]
+    return "\n".join(useful[-10:])[:1600]
+
+
+def parse_args(argv):
+    parser = Parser(
+        prog="vestroyer",
+        description="Destroy video quality from the Linux command line without changing FPS.",
+        usage="vestroyer INPUT -preset PRESET OUTPUT",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  vestroyer ~/videos/movie.mp4 -preset 144 ~/videos/movie-low-quality.mp4\n"
+            "  vestroyer input.mov -preset wtf output.mp4\n"
+            "  vestroyer input.mkv -preset 480 output.mp4\n"
+            "  vestroyer -preset help\n"
+        ),
+    )
+    parser.add_argument("input", nargs="?", help="input video path")
+    parser.add_argument("-preset", "--preset", dest="preset", help="video and audio destruction preset; use '-preset help' to list presets")
+    parser.add_argument("-apreset", "--apreset", dest="apreset", default="crunchy", help="audio destruction preset; use '-apreset help' to list presets (default: crunchy)")
+    parser.add_argument("output", nargs="?", help="output video path, usually .mp4")
+    parser.add_argument("--ffmpeg", default="ffmpeg", help="ffmpeg binary to use, default: ffmpeg from PATH")
+    parser.add_argument("--version", action="version", version=f"vestroyer {VERSION}")
+    parse = getattr(parser, "parse_intermixed_args", parser.parse_args)
+    args = parse(argv)
+
+    if not args.input or not args.output or not args.preset:
+        parser.print_help(sys.stderr)
+        return None
+    return args
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if maybe_show_flag_help(argv):
+        return 0
+
+    args = parse_args(argv)
+    if args is None:
+        return 2
+
+    ffmpeg = shutil.which(args.ffmpeg) if args.ffmpeg == "ffmpeg" else args.ffmpeg
+    if not ffmpeg:
+        print("error: ffmpeg not found. Install ffmpeg first, e.g. sudo apt install ffmpeg", file=sys.stderr)
+        return 127
+
+    preset_name = normalize_preset(args.preset)
+    if preset_name not in PRESETS:
+        print(f"error: unknown preset: {args.preset}\n", file=sys.stderr)
+        print(preset_help(), file=sys.stderr)
+        return 2
+
+    audio_preset_name = normalize_audio_preset(args.apreset)
+    if audio_preset_name not in AUDIO_PRESETS:
+        print(f"error: unknown audio preset: {args.apreset}\n", file=sys.stderr)
+        print(audio_preset_help(), file=sys.stderr)
+        return 2
+
+    input_path = Path(args.input).expanduser()
+    output_path = Path(args.output).expanduser()
+    if not input_path.exists():
+        print(f"error: input file does not exist: {input_path}", file=sys.stderr)
+        return 2
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    preset = PRESETS[preset_name]
+    audio_preset = AUDIO_PRESETS[audio_preset_name]
+
+    attempts = [
+        (True, True),
+        (False, True),
+        (True, False),
+        (False, False),
+    ]
+    last_result = None
+    for passthrough_fps, include_audio in attempts:
+        command = build_command(ffmpeg, input_path, output_path, preset, audio_preset, passthrough_fps, include_audio)
+        last_result = subprocess.run(command, capture_output=True, text=True)
+        if last_result.returncode == 0:
+            audio_note = "" if include_audio else " (audio skipped as fallback)"
+            print(f"done: {output_path}{audio_note}")
+            return 0
+
+    print("error: could not process this file", file=sys.stderr)
+    print(short_ffmpeg_error(last_result.stderr), file=sys.stderr)
+    return last_result.returncode or 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

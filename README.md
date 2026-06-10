@@ -1,49 +1,128 @@
-Vestroyer portable
-==================
+# Vestroyer CLI for Linux
 
-Run:
-1. Open Vestroyer.exe.
-2. Choose English or Polski.
-3. Pick a video and destroy it.
+Vestroyer is a small Linux command-line tool for wrecking video quality while
+keeping FPS behavior unchanged.
 
-Do not remove ffmpeg.exe from this folder. The app uses it to process videos.
+Current version: **1.1**
 
-Windows SmartScreen:
-Windows may show a SmartScreen warning because Vestroyer is a new unsigned
-.exe file. The app is portable, does not install anything, and runs from this
-folder. If you trust the download source, click "More info", then
-"Run anyway".
+## Requirements
 
-Portable notes:
-- No installation required.
-- No PATH setup required.
-- Output files are saved wherever you choose in the app.
-- The app keeps FPS behavior unchanged: it does not force a new FPS value.
+- Linux
+- Python 3
+- FFmpeg available as `ffmpeg`
 
-Included:
-- Vestroyer.exe
-- ffmpeg.exe
+## Install
 
-Polski:
-Uruchamianie:
-1. Otwórz Vestroyer.exe.
-2. Wybierz English albo Polski.
-3. Wybierz film i rozwal jego jakość.
+Recommended:
 
-Nie usuwaj ffmpeg.exe z tego folderu. Program używa go do przerabiania filmów.
+```bash
+chmod +x install.sh
+./install.sh
+```
 
-Windows SmartScreen:
-Windows może pokazać ostrzeżenie SmartScreen, ponieważ Vestroyer jest nowym,
-niepodpisanym plikiem .exe. Program jest portable, nie instaluje niczego w
-systemie i działa z tego folderu. Jeśli ufasz źródłu pobrania, kliknij
-"Więcej informacji", a potem "Uruchom mimo to".
+The installer checks `python3` and `ffmpeg`, shows dependency names up front,
+prints dependency status in green/red, and shows live package manager output
+while it installs missing pieces.
 
-Notatki portable:
-- Nie trzeba nic instalować.
-- Nie trzeba dodawać niczego do PATH.
-- Pliki wynikowe zapisują się tam, gdzie wskażesz w programie.
-- Program nie wymusza nowej wartości FPS.
+Manual install:
 
-W zestawie:
-- Vestroyer.exe
-- ffmpeg.exe
+```bash
+chmod +x vestroyer
+sudo cp vestroyer /usr/local/bin/vestroyer
+```
+
+Uninstall:
+
+```bash
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+## Usage
+
+```bash
+vestroyer INPUT -preset PRESET OUTPUT
+```
+
+Separate audio control:
+
+```bash
+vestroyer INPUT -preset PRESET -apreset APRESET OUTPUT
+```
+
+Examples:
+
+```bash
+vestroyer ~/videos/movie.mp4 -preset 144 ~/videos/movie-low-quality.mp4
+vestroyer input.mov -preset wtf -apreset destroyed output.mp4
+```
+
+## Help
+
+Show preset list:
+
+```bash
+vestroyer -preset help
+```
+
+Show audio preset list:
+
+```bash
+vestroyer -apreset help
+```
+
+Show full help:
+
+```bash
+vestroyer --help
+```
+
+## Presets
+
+- `4k` - 4K UHD, nearly clean
+- `1080` - Full HD
+- `720` - HD
+- `480` - 480p
+- `360` - 360p
+- `240` - 240p
+- `144` - 144p
+- `96` - 96p
+- `wtf` - 64x36, barely visible
+
+Aliases:
+
+- `2160`, `uhd` -> `4k`
+- `fullhd`, `fhd` -> `1080`
+- `hd` -> `720`
+- `36`, `64x36` -> `wtf`
+
+## Audio presets
+
+- `clean` - 128k
+- `normal` - 96k
+- `low` - 64k
+- `crunchy` - 32k
+- `phone` - 16k
+- `destroyed` - 8k
+
+Audio aliases:
+
+- `128k` -> `clean`
+- `96k` -> `normal`
+- `64k` -> `low`
+- `32k` -> `crunchy`
+- `16k` -> `phone`
+- `8k` -> `destroyed`
+
+## Test presets
+
+```bash
+chmod +x test_presets.sh
+./test_presets.sh
+```
+
+## Notes
+
+Vestroyer does not use `-r` and does not add an FPS filter, so it does not
+force a new FPS value. It tries `-fps_mode passthrough` first and falls back
+automatically if needed.
