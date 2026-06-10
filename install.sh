@@ -208,7 +208,7 @@ main() {
   VESTROYER_PATH="$TMP_DIR/vestroyer"
 
   log "downloading vestroyer..."
-  download_file "$REPO_BASE/sources/linux-cli/vestroyer" "$VESTROYER_PATH"
+  download_file "$REPO_BASE/vestroyer" "$VESTROYER_PATH"
   chmod +x "$VESTROYER_PATH"
 
   log "copying vestroyer to $TARGET"
