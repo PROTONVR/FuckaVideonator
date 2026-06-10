@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
-SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-SOURCE="$SOURCE_DIR/vestroyer"
+REPO_BASE="https://raw.githubusercontent.com/PROTONVR/Vestroyer-The-Video-Destroyer/main"
 TARGET="/usr/local/bin/vestroyer"
+TMP_DIR=""
 
 if [ -t 1 ]; then
   GREEN=$(printf '\033[32m')
@@ -72,6 +72,38 @@ run_privileged() {
   fi
 }
 
+make_tmp_dir() {
+  if command -v mktemp >/dev/null 2>&1; then
+    mktemp -d
+  else
+    d="./vestroyer-install.$$"
+    mkdir -p "$d"
+    printf '%s\n' "$d"
+  fi
+}
+
+cleanup() {
+  if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+    rm -rf "$TMP_DIR"
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
+download_file() {
+  url=$1
+  dest=$2
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$dest"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$url"
+  else
+    log "error: curl or wget is required"
+    exit 1
+  fi
+}
+
 install_pkg() {
   dep=$1
   pkg_mgr=$2
@@ -135,11 +167,6 @@ prompt_install() {
 }
 
 main() {
-  if [ ! -f "$SOURCE" ]; then
-    log "error: vestroyer script not found next to install.sh"
-    exit 1
-  fi
-
   pkg_mgr=$(detect_pkg_mgr)
 
   log "Vestroyer Linux CLI installer"
@@ -177,14 +204,19 @@ main() {
     log "${GREEN}all dependencies already installed${RESET}"
   fi
 
-  log "copying vestroyer to $TARGET"
-  chmod +x "$SOURCE"
+  TMP_DIR=$(make_tmp_dir)
+  VESTROYER_PATH="$TMP_DIR/vestroyer"
 
+  log "downloading vestroyer..."
+  download_file "$REPO_BASE/sources/linux-cli/vestroyer" "$VESTROYER_PATH"
+  chmod +x "$VESTROYER_PATH"
+
+  log "copying vestroyer to $TARGET"
   if [ "$(id -u)" -eq 0 ]; then
-    cp "$SOURCE" "$TARGET"
+    cp "$VESTROYER_PATH" "$TARGET"
     chmod 755 "$TARGET"
   elif command -v sudo >/dev/null 2>&1; then
-    sudo cp "$SOURCE" "$TARGET"
+    sudo cp "$VESTROYER_PATH" "$TARGET"
     sudo chmod 755 "$TARGET"
   else
     log "error: root privileges required to install to $TARGET"
